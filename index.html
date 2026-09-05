@@ -209,6 +209,78 @@
     font-size:15px;margin-top:10px;
   }
   .btn-danger{color:var(--danger);border-color:rgba(255,123,123,0.4);}
+  .id-display{
+    background:var(--surface);
+    border:1px solid var(--surface-2);
+    border-radius:var(--radius-md);
+    padding:18px;
+    text-align:center;
+  }
+  .id-display .id-value{
+    font-family:var(--font-num);
+    font-size:clamp(16px,4.6vw,20px);
+    letter-spacing:1px;
+    color:var(--text);
+    word-break:break-all;
+    line-height:1.6;
+  }
+  .id-qr-wrap{
+    display:flex;
+    justify-content:center;
+    margin:14px 0;
+  }
+  .id-qr-wrap canvas{
+    border-radius:12px;
+    background:#fff;
+    padding:10px;
+  }
+  .id-actions{
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+  }
+  .id-actions button{flex:1;}
+  .btn-link{
+    background:none;
+    border:none;
+    color:var(--accent);
+    font-size:14px;
+    font-weight:600;
+    padding:10px;
+  }
+  .scan-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .scan-tabs button{
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--surface-2);
+    color:var(--text-dim);
+    border-radius:999px;
+    padding:9px 0;
+    font-size:13px;
+    font-weight:600;
+  }
+  .scan-tabs button.active{
+    background:var(--accent-soft);
+    color:var(--accent);
+    border-color:var(--accent);
+  }
+  #scan-video{
+    width:100%;
+    border-radius:var(--radius-md);
+    background:#000;
+    aspect-ratio:1/1;
+    object-fit:cover;
+  }
+  .scan-hint{
+    color:var(--text-dim);
+    font-size:12px;
+    text-align:center;
+    margin-top:10px;
+  }
   .id-chip{
     display:flex;align-items:center;justify-content:space-between;
     background:var(--surface);border-radius:var(--radius-sm);
@@ -229,6 +301,7 @@
     display:flex;align-items:flex-end;justify-content:center;z-index:50;
   }
   .modal-backdrop.hidden{display:none;}
+  .hidden{display:none !important;}
   .modal-sheet{
     width:100%;max-width:480px;background:var(--bg-elev);
     border-radius:24px 24px 0 0;padding:22px 20px calc(22px + var(--safe-bottom));
@@ -287,16 +360,17 @@
   <section id="screen-onboard" class="screen">
     <div class="topbar"><h1>Set up messaging</h1></div>
     <div class="panel">
-      <p class="help-text">Choose an ID. This is what you share with people so they can message you — like a username. Only letters, numbers, underscore and dash.</p>
-      <div class="field">
-        <label for="onboard-id">Your ID</label>
-        <input id="onboard-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. river92" />
+      <p class="help-text">This ID was generated just for you. It's long on purpose, so it's yours alone — no picking a name, no checking availability. Share it with someone (or let them scan the QR code) so they can message you.</p>
+      <div class="id-display">
+        <div class="id-value" id="onboard-id-value">—</div>
+        <div class="id-qr-wrap"><canvas id="onboard-id-qr"></canvas></div>
+        <button class="btn-link" id="btn-regenerate-id" type="button">Generate a different ID</button>
       </div>
-      <div class="field">
+      <div class="field" style="margin-top:18px;">
         <label for="onboard-name">Display name (optional)</label>
         <input id="onboard-name" type="text" autocomplete="off" placeholder="What contacts see" />
       </div>
-      <p class="settings-msg error" id="onboard-msg"></p>
+      <p class="settings-msg" id="onboard-msg"></p>
       <button class="btn-primary" id="onboard-submit">Continue</button>
     </div>
   </section>
@@ -343,6 +417,11 @@
         <code id="settings-your-id">—</code>
         <button id="btn-copy-id">Copy</button>
       </div>
+      <div class="id-qr-wrap"><canvas id="settings-id-qr"></canvas></div>
+      <p class="help-text" style="margin-top:0;text-align:center;">Let someone scan this to add you — no need to type or share it any other way.</p>
+      <div class="id-actions">
+        <button class="btn-secondary" id="btn-share-id" type="button">Share ID</button>
+      </div>
 
       <div class="section-title">Display name</div>
       <div class="field">
@@ -379,18 +458,31 @@
   <div class="modal-backdrop hidden" id="modal-add-contact">
     <div class="modal-sheet">
       <h2>Add contact</h2>
-      <form id="add-contact-form">
-        <div class="field">
-          <label for="add-contact-id">Their ID</label>
-          <input id="add-contact-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required />
-        </div>
-        <div class="field">
-          <label for="add-contact-name">Nickname (optional)</label>
-          <input id="add-contact-name" type="text" autocomplete="off" />
-        </div>
-        <button class="btn-primary" type="submit">Add</button>
-        <button class="btn-secondary" type="button" id="btn-cancel-add-contact">Cancel</button>
-      </form>
+      <div class="scan-tabs">
+        <button type="button" class="active" id="tab-type-id">Enter ID</button>
+        <button type="button" id="tab-scan-qr">Scan QR</button>
+      </div>
+
+      <div id="add-contact-type-pane">
+        <form id="add-contact-form">
+          <div class="field">
+            <label for="add-contact-id">Their ID</label>
+            <input id="add-contact-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required />
+          </div>
+          <div class="field">
+            <label for="add-contact-name">Nickname (optional)</label>
+            <input id="add-contact-name" type="text" autocomplete="off" />
+          </div>
+          <button class="btn-primary" type="submit">Add</button>
+          <button class="btn-secondary" type="button" id="btn-cancel-add-contact">Cancel</button>
+        </form>
+      </div>
+
+      <div id="add-contact-scan-pane" class="hidden">
+        <video id="scan-video" playsinline muted></video>
+        <p class="scan-hint" id="scan-hint">Point your camera at their QR code.</p>
+        <button class="btn-secondary" type="button" id="btn-cancel-scan">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -413,6 +505,8 @@
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 (() => {
 "use strict";
@@ -819,6 +913,9 @@ async function enterVault(key){
   currentVaultKey = key;
   const profile = await loadProfile(key);
   if (!profile){
+    refreshOnboardId();
+    document.getElementById("onboard-name").value = "";
+    document.getElementById("onboard-msg").textContent = "";
     showScreen("screen-onboard");
     return;
   }
@@ -829,25 +926,60 @@ async function enterVault(key){
 }
 
 function sanitizeId(raw){
-  return raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24);
+  return raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 48);
 }
 
+// Crockford base32 alphabet (no I, L, O, U — nothing that can be misread).
+const ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
+function generateUserId(){
+  // 120 bits of randomness — collisions are astronomically unlikely,
+  // so there is never a "this ID is taken" moment for the person to hit.
+  const bytes = crypto.getRandomValues(new Uint8Array(15));
+  let bits = "";
+  for (const b of bytes) bits += b.toString(2).padStart(8, "0");
+  let out = "";
+  for (let i = 0; i + 5 <= bits.length; i += 5){
+    out += ID_ALPHABET[parseInt(bits.slice(i, i + 5), 2)];
+  }
+  return out.match(/.{1,4}/g).join("-"); // grouped for readability, e.g. abcd-efgh-jkmn-...
+}
+
+function renderIdQr(canvasEl, id){
+  if (!canvasEl || typeof QRCode === "undefined") return;
+  QRCode.toCanvas(canvasEl, id, { width: 220, margin: 1, color: { dark: "#150e24", light: "#ffffff" } }, () => {});
+}
+
+let onboardCandidateId = "";
+function refreshOnboardId(){
+  onboardCandidateId = generateUserId();
+  document.getElementById("onboard-id-value").textContent = onboardCandidateId;
+  renderIdQr(document.getElementById("onboard-id-qr"), onboardCandidateId);
+}
+document.getElementById("btn-regenerate-id").addEventListener("click", refreshOnboardId);
+
 document.getElementById("onboard-submit").addEventListener("click", async () => {
-  const idInput = document.getElementById("onboard-id");
   const nameInput = document.getElementById("onboard-name");
   const msgEl = document.getElementById("onboard-msg");
-  const id = sanitizeId(idInput.value);
-  if (id.length < 3){
-    msgEl.textContent = "ID must be at least 3 characters (letters, numbers, _ or -).";
-    return;
-  }
   msgEl.textContent = "Connecting…";
-  try{
-    await startPeerSession(id);
-  }catch(err){
-    msgEl.textContent = "That ID is taken or unavailable — try another.";
+
+  let id = onboardCandidateId;
+  let connected = false;
+  for (let attempt = 0; attempt < 5 && !connected; attempt++){
+    try{
+      await startPeerSession(id);
+      connected = true;
+    }catch(err){
+      // Practically only happens if the exact same 120-bit ID is already
+      // open somewhere else — regenerate silently and try again.
+      id = generateUserId();
+    }
+  }
+  if (!connected){
+    msgEl.textContent = "Couldn't connect right now — check your internet connection and try again.";
+    msgEl.classList.add("error");
     return;
   }
+
   const profile = { peerId: id, displayName: nameInput.value.trim() || id };
   myProfile = profile;
   await saveProfile(currentVaultKey, profile);
@@ -1078,22 +1210,95 @@ function formatTime(ts){
 document.getElementById("btn-add-contact").addEventListener("click", () => {
   document.getElementById("add-contact-id").value = "";
   document.getElementById("add-contact-name").value = "";
+  switchAddContactTab("type");
   openModal("modal-add-contact");
 });
 document.getElementById("btn-cancel-add-contact").addEventListener("click", () => closeModal("modal-add-contact"));
 document.getElementById("add-contact-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const peerId = sanitizeId(document.getElementById("add-contact-id").value);
-  const nickname = document.getElementById("add-contact-name").value.trim() || peerId;
+  await addContactById(sanitizeId(document.getElementById("add-contact-id").value), document.getElementById("add-contact-name").value.trim());
+});
+async function addContactById(peerId, nicknameRaw){
+  const nickname = nicknameRaw || peerId;
   if (!peerId) return;
   const contacts = await loadContacts(currentVaultKey);
   if (!contacts.find(c => c.peerId === peerId)){
     contacts.push({ peerId, nickname, addedAt: Date.now() });
     await saveContacts(currentVaultKey, contacts);
   }
+  stopQrScan();
   closeModal("modal-add-contact");
   await renderChatListScreen();
-});
+  showToast("Contact added");
+}
+
+/* ---- Add-contact: type vs scan tabs ---- */
+function switchAddContactTab(which){
+  const typeTab = document.getElementById("tab-type-id");
+  const scanTab = document.getElementById("tab-scan-qr");
+  const typePane = document.getElementById("add-contact-type-pane");
+  const scanPane = document.getElementById("add-contact-scan-pane");
+  if (which === "scan"){
+    typeTab.classList.remove("active"); scanTab.classList.add("active");
+    typePane.classList.add("hidden"); scanPane.classList.remove("hidden");
+    startQrScan();
+  } else {
+    scanTab.classList.remove("active"); typeTab.classList.add("active");
+    scanPane.classList.add("hidden"); typePane.classList.remove("hidden");
+    stopQrScan();
+  }
+}
+document.getElementById("tab-type-id").addEventListener("click", () => switchAddContactTab("type"));
+document.getElementById("tab-scan-qr").addEventListener("click", () => switchAddContactTab("scan"));
+document.getElementById("btn-cancel-scan").addEventListener("click", () => switchAddContactTab("type"));
+
+let qrScanStream = null;
+let qrScanRAF = null;
+async function startQrScan(){
+  const video = document.getElementById("scan-video");
+  const hint = document.getElementById("scan-hint");
+  if (typeof jsQR === "undefined"){
+    hint.textContent = "QR scanning isn't available — enter the ID instead.";
+    return;
+  }
+  try{
+    qrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  }catch(e){
+    hint.textContent = "Camera access is needed to scan a code.";
+    return;
+  }
+  video.srcObject = qrScanStream;
+  await video.play();
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const tick = () => {
+    if (!qrScanStream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA){
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code && code.data){
+        const peerId = sanitizeId(code.data);
+        if (peerId){
+          addContactById(peerId, "");
+          return;
+        }
+      }
+    }
+    qrScanRAF = requestAnimationFrame(tick);
+  };
+  qrScanRAF = requestAnimationFrame(tick);
+}
+function stopQrScan(){
+  if (qrScanRAF) cancelAnimationFrame(qrScanRAF);
+  qrScanRAF = null;
+  if (qrScanStream){
+    qrScanStream.getTracks().forEach(t => t.stop());
+    qrScanStream = null;
+  }
+}
 
 /* =========================== CONVERSATION UI =========================== */
 
@@ -1249,7 +1454,21 @@ document.getElementById("btn-settings").addEventListener("click", async () => {
   document.getElementById("settings-display-name").value = myProfile ? myProfile.displayName : "";
   document.getElementById("pin-msg").textContent = "";
   document.getElementById("change-pin-form").reset();
+  if (myProfile) renderIdQr(document.getElementById("settings-id-qr"), myProfile.peerId);
   showScreen("screen-settings");
+});
+document.getElementById("btn-share-id").addEventListener("click", async () => {
+  if (!myProfile) return;
+  if (navigator.share){
+    try{ await navigator.share({ text: myProfile.peerId }); }catch(e){ /* cancelled */ }
+  } else {
+    try{
+      await navigator.clipboard.writeText(myProfile.peerId);
+      showToast("ID copied");
+    }catch(e){
+      showToast(myProfile.peerId);
+    }
+  }
 });
 document.getElementById("btn-copy-id").addEventListener("click", async () => {
   if (!myProfile) return;
