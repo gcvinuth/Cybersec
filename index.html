@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Calculator</title>
+<meta name="theme-color" content="#0f0a1a" />
+<meta name="description" content="Simple calculator" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<style>
+  :root{
+    --bg:#0f0a1a;
+    --bg-elev:#150e24;
+    --surface:#1d1330;
+    --surface-2:#291a45;
+    --key-num:#241834;
+    --key-op:#3b2160;
+    --accent:#9d4edd;
+    --accent-2:#7b2cbf;
+    --accent-soft:rgba(199,125,255,0.16);
+    --text:#f3edff;
+    --text-dim:#a996c9;
+    --danger:#ff7b7b;
+    --success:#5fe0a0;
+    --radius-lg:22px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-num:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-ui);
+    overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{
+    height:100vh;
+    height:100dvh;
+    max-width:480px;
+    margin:0 auto;
+    position:relative;
+    overflow:hidden;
+    background:var(--bg);
+  }
+  .screen{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    background:var(--bg);
+  }
+  .screen.active{display:flex;}
+  button{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ---------- Calculator ---------- */
+  #screen-calc{padding:calc(18px + var(--safe-top)) 18px calc(22px + var(--safe-bottom));}
+  .calc-display{
+    flex:1;
+    display:flex;
+    align-items:flex-end;
+    justify-content:flex-end;
+    padding:0 6px 18px;
+    min-height:120px;
+  }
+  .calc-display span{
+    font-family:var(--font-num);
+    font-size:clamp(36px,11vw,56px);
+    font-weight:500;
+    letter-spacing:0.5px;
+    word-break:break-all;
+    text-align:right;
+    color:var(--text);
+  }
+  .calc-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+  }
+  .calc-key{
+    border:none;
+    border-radius:999px;
+    aspect-ratio:1.35/1;
+    font-size:22px;
+    font-weight:500;
+    color:var(--text);
+    background:var(--key-num);
+    transition:transform .06s ease, background .15s ease;
+  }
+  .calc-key:active{transform:scale(0.94);}
+  .calc-key.op{background:var(--key-op);color:#e9d6ff;}
+  .calc-key.accent{background:var(--accent);color:#160a24;font-weight:600;}
+  .calc-key.wide{grid-column:span 2;aspect-ratio:auto;justify-self:stretch;}
+
+  /* ---------- Shared chrome ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:calc(14px + var(--safe-top)) 16px 12px;
+    background:var(--bg-elev);
+    border-bottom:1px solid rgba(157,78,221,0.15);
+  }
+  .topbar h1{font-size:19px;margin:0;font-weight:600;flex:1;}
+  .icon-btn{
+    width:38px;height:38px;border:none;border-radius:12px;
+    background:var(--surface);color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;flex-shrink:0;
+  }
+  .icon-btn:active{background:var(--surface-2);}
+
+  /* ---------- Chat list ---------- */
+  #chat-list{flex:1;overflow-y:auto;padding:8px 8px calc(8px + var(--safe-bottom));}
+  .empty-state{
+    text-align:center;color:var(--text-dim);
+    padding:60px 24px;font-size:15px;line-height:1.5;
+  }
+  .contact-row{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 10px;border-radius:var(--radius-md);
+    cursor:pointer;
+  }
+  .contact-row:active{background:var(--surface);}
+  .avatar{
+    width:46px;height:46px;border-radius:50%;
+    background:linear-gradient(145deg,var(--accent),var(--accent-2));
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600;font-size:18px;color:#160a24;flex-shrink:0;
+    position:relative;
+  }
+  .status-dot{
+    position:absolute;bottom:-1px;right:-1px;
+    width:12px;height:12px;border-radius:50%;
+    background:var(--text-dim);border:2px solid var(--bg);
+  }
+  .status-dot.online{background:var(--success);}
+  .contact-meta{flex:1;min-width:0;}
+  .contact-meta .name{font-weight:600;font-size:15.5px;}
+  .contact-meta .preview{color:var(--text-dim);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .contact-time{color:var(--text-dim);font-size:12px;flex-shrink:0;}
+
+  /* ---------- Conversation ---------- */
+  #convo-header-name{font-size:16px;font-weight:600;line-height:1.2;}
+  #convo-header-status{font-size:12px;color:var(--text-dim);line-height:1.2;}
+  #convo-messages{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px;}
+  .bubble{
+    max-width:78%;
+    padding:9px 13px;
+    border-radius:var(--radius-md);
+    font-size:15px;line-height:1.4;
+    word-wrap:break-word;
+    position:relative;
+  }
+  .bubble.out{align-self:flex-end;background:var(--accent-2);color:#f6ecff;border-bottom-right-radius:4px;}
+  .bubble.in{align-self:flex-start;background:var(--surface);color:var(--text);border-bottom-left-radius:4px;}
+  .bubble.system{
+    align-self:center;background:transparent;color:var(--text-dim);
+    font-size:12.5px;text-align:center;max-width:90%;
+  }
+  .bubble img{max-width:100%;border-radius:var(--radius-sm);display:block;margin-top:2px;}
+  .bubble .meta{display:flex;gap:5px;align-items:center;justify-content:flex-end;margin-top:3px;font-size:10.5px;opacity:0.7;}
+  #convo-input-row{
+    display:flex;align-items:flex-end;gap:8px;
+    padding:10px 10px calc(10px + var(--safe-bottom));
+    background:var(--bg-elev);border-top:1px solid rgba(157,78,221,0.15);
+  }
+  #convo-input{
+    flex:1;resize:none;max-height:110px;
+    background:var(--surface);color:var(--text);
+    border:1px solid transparent;border-radius:18px;
+    padding:10px 14px;font-size:15px;font-family:inherit;line-height:1.35;
+  }
+  #convo-input:focus{border-color:var(--accent);}
+  .send-btn{
+    width:42px;height:42px;border-radius:50%;border:none;
+    background:var(--accent);color:#160a24;font-size:18px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .send-btn:active{background:var(--accent-2);color:#fff;}
+
+  /* ---------- Forms / settings / onboarding ---------- */
+  .panel{flex:1;overflow-y:auto;padding:20px 20px calc(20px + var(--safe-bottom));}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px;}
+  .field input{
+    width:100%;padding:12px 14px;border-radius:var(--radius-sm);
+    border:1px solid rgba(157,78,221,0.25);background:var(--surface);
+    color:var(--text);font-size:15.5px;font-family:inherit;
+  }
+  .field input:focus{border-color:var(--accent);}
+  .btn-primary{
+    width:100%;padding:13px;border:none;border-radius:var(--radius-sm);
+    background:var(--accent);color:#160a24;font-size:15.5px;font-weight:600;
+  }
+  .btn-primary:active{background:var(--accent-2);color:#fff;}
+  .btn-secondary{
+    width:100%;padding:13px;border:1px solid rgba(157,78,221,0.35);
+    border-radius:var(--radius-sm);background:transparent;color:var(--text);
+    font-size:15px;margin-top:10px;
+  }
+  .btn-danger{color:var(--danger);border-color:rgba(255,123,123,0.4);}
+  .id-chip{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--surface);border-radius:var(--radius-sm);
+    padding:12px 14px;margin-bottom:18px;
+  }
+  .id-chip code{font-family:var(--font-num);font-size:15px;color:var(--accent);}
+  .id-chip button{background:none;border:none;color:var(--text-dim);font-size:13px;}
+  .settings-msg{font-size:13.5px;margin:-6px 0 14px;min-height:16px;}
+  .settings-msg.error{color:var(--danger);}
+  .settings-msg.success{color:var(--success);}
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-dim);margin:24px 0 10px;}
+  .help-text{color:var(--text-dim);font-size:13px;line-height:1.5;margin-top:-6px;margin-bottom:18px;}
+  hr.sep{border:none;border-top:1px solid rgba(157,78,221,0.15);margin:22px 0;}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:absolute;inset:0;background:rgba(6,3,12,0.6);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .modal-backdrop.hidden{display:none;}
+  .modal-sheet{
+    width:100%;max-width:480px;background:var(--bg-elev);
+    border-radius:24px 24px 0 0;padding:22px 20px calc(22px + var(--safe-bottom));
+  }
+  .modal-sheet h2{margin:0 0 16px;font-size:18px;}
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:absolute;left:50%;top:calc(14px + var(--safe-top));
+    transform:translateX(-50%);
+    background:var(--surface-2);color:var(--text);
+    padding:10px 16px;border-radius:999px;font-size:13.5px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.35);
+    opacity:0;pointer-events:none;transition:opacity .25s ease, top .25s ease;
+    z-index:80;max-width:85%;text-align:center;
+  }
+  #toast.show{opacity:1;top:calc(22px + var(--safe-top));}
+
+  ::-webkit-scrollbar{width:0;height:0;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= CALCULATOR (default screen / lock) ================= -->
+  <section id="screen-calc" class="screen active">
+    <div class="calc-display"><span id="calc-display-text">0</span></div>
+    <div class="calc-grid">
+      <button class="calc-key op" data-action="clear">AC</button>
+      <button class="calc-key op" data-action="backspace">⌫</button>
+      <button class="calc-key op" data-op="%">%</button>
+      <button class="calc-key op" data-op="/">÷</button>
+
+      <button class="calc-key" data-digit="7">7</button>
+      <button class="calc-key" data-digit="8">8</button>
+      <button class="calc-key" data-digit="9">9</button>
+      <button class="calc-key op" data-op="*">×</button>
+
+      <button class="calc-key" data-digit="4">4</button>
+      <button class="calc-key" data-digit="5">5</button>
+      <button class="calc-key" data-digit="6">6</button>
+      <button class="calc-key op" data-op="-">−</button>
+
+      <button class="calc-key" data-digit="1">1</button>
+      <button class="calc-key" data-digit="2">2</button>
+      <button class="calc-key" data-digit="3">3</button>
+      <button class="calc-key op" data-op="+">+</button>
+
+      <button class="calc-key wide" data-digit="0">0</button>
+      <button class="calc-key" data-action="dot">.</button>
+      <button class="calc-key accent" data-action="equals">=</button>
+    </div>
+  </section>
+
+  <!-- ================= ONBOARDING (first unlock only) ================= -->
+  <section id="screen-onboard" class="screen">
+    <div class="topbar"><h1>Set up messaging</h1></div>
+    <div class="panel">
+      <p class="help-text">Choose an ID. This is what you share with people so they can message you — like a username. Only letters, numbers, underscore and dash.</p>
+      <div class="field">
+        <label for="onboard-id">Your ID</label>
+        <input id="onboard-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. river92" />
+      </div>
+      <div class="field">
+        <label for="onboard-name">Display name (optional)</label>
+        <input id="onboard-name" type="text" autocomplete="off" placeholder="What contacts see" />
+      </div>
+      <p class="settings-msg error" id="onboard-msg"></p>
+      <button class="btn-primary" id="onboard-submit">Continue</button>
+    </div>
+  </section>
+
+  <!-- ================= CHAT LIST ================= -->
+  <section id="screen-chats" class="screen">
+    <div class="topbar">
+      <h1>Messages</h1>
+      <button class="icon-btn" id="btn-lock" title="Lock">🔒</button>
+      <button class="icon-btn" id="btn-settings" title="Settings">⚙️</button>
+      <button class="icon-btn" id="btn-add-contact" title="Add contact">＋</button>
+    </div>
+    <div id="chat-list"></div>
+  </section>
+
+  <!-- ================= CONVERSATION ================= -->
+  <section id="screen-convo" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" id="btn-back-to-chats">←</button>
+      <div style="flex:1;min-width:0;">
+        <div id="convo-header-name">—</div>
+        <div id="convo-header-status">—</div>
+      </div>
+      <button class="icon-btn" id="btn-rename-contact" title="Rename">✎</button>
+    </div>
+    <div id="convo-messages"></div>
+    <div id="convo-input-row">
+      <button class="icon-btn" id="btn-attach" title="Send image">📎</button>
+      <input type="file" id="convo-attach-input" accept="image/*" hidden />
+      <textarea id="convo-input" rows="1" placeholder="Message"></textarea>
+      <button class="send-btn" id="btn-send" title="Send">➤</button>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section id="screen-settings" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" id="btn-back-to-chats-2">←</button>
+      <h1>Settings</h1>
+    </div>
+    <div class="panel">
+      <div class="section-title">Your ID</div>
+      <div class="id-chip">
+        <code id="settings-your-id">—</code>
+        <button id="btn-copy-id">Copy</button>
+      </div>
+
+      <div class="section-title">Display name</div>
+      <div class="field">
+        <input id="settings-display-name" type="text" />
+      </div>
+      <button class="btn-secondary" id="btn-save-name">Save name</button>
+
+      <hr class="sep" />
+
+      <div class="section-title">Change PIN</div>
+      <form id="change-pin-form">
+        <div class="field">
+          <label for="pin-old">Current PIN</label>
+          <input id="pin-old" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="pin-new1">New PIN (4–8 digits)</label>
+          <input id="pin-new1" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="pin-new2">Confirm new PIN</label>
+          <input id="pin-new2" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+        </div>
+        <p class="settings-msg" id="pin-msg"></p>
+        <button class="btn-primary" type="submit">Update PIN</button>
+      </form>
+
+      <hr class="sep" />
+      <button class="btn-secondary btn-danger" id="btn-lock-2">Lock now</button>
+    </div>
+  </section>
+
+  <!-- ================= ADD CONTACT MODAL ================= -->
+  <div class="modal-backdrop hidden" id="modal-add-contact">
+    <div class="modal-sheet">
+      <h2>Add contact</h2>
+      <form id="add-contact-form">
+        <div class="field">
+          <label for="add-contact-id">Their ID</label>
+          <input id="add-contact-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required />
+        </div>
+        <div class="field">
+          <label for="add-contact-name">Nickname (optional)</label>
+          <input id="add-contact-name" type="text" autocomplete="off" />
+        </div>
+        <button class="btn-primary" type="submit">Add</button>
+        <button class="btn-secondary" type="button" id="btn-cancel-add-contact">Cancel</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= RENAME CONTACT MODAL ================= -->
+  <div class="modal-backdrop hidden" id="modal-rename-contact">
+    <div class="modal-sheet">
+      <h2>Rename contact</h2>
+      <form id="rename-contact-form">
+        <div class="field">
+          <label for="rename-contact-name">Nickname</label>
+          <input id="rename-contact-name" type="text" autocomplete="off" required />
+        </div>
+        <button class="btn-primary" type="submit">Save</button>
+        <button class="btn-secondary" type="button" id="btn-cancel-rename-contact">Cancel</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+(() => {
+"use strict";
+
+/* =========================================================================
+   CALCULATOR-VAULT MESSENGER
+   ---------------------------------------------------------------------
+   Everything below the "CALCULATOR CORE" section only runs *after* the
+   correct PIN has been entered. Until then, this is a plain, functional
+   calculator with zero network activity.
+
+   Security model (read this before relying on it for anything sensitive):
+   - Local vault: PIN never stored. A random salt + PBKDF2 (200k rounds,
+     SHA-256) derives an AES-256-GCM key. Correctness is proven by
+     successfully decrypting a small "canary" value — nothing else.
+     That same key encrypts your contact list and every stored message
+     at rest, in this browser only.
+   - Transport: two devices find each other through PeerJS's public
+     signaling broker (peerjs.com), which only helps set up a direct
+     WebRTC connection — it never sees message content.
+   - End-to-end layer: once connected, each session does an ephemeral
+     ECDH (P-256) key exchange and derives a fresh AES-256-GCM key used
+     to encrypt every message/image sent over that connection. This key
+     lives only in memory and is discarded when the connection closes.
+   - Because there is no backend server, delivery only works while BOTH
+     people have the app open at the same time — there is no store-
+     and-forward for offline contacts. Locking the vault disconnects you.
+   ========================================================================= */
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function bufToB64(buf){
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64ToBuf(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function screenIsActive(id){
+  return document.getElementById(id).classList.contains("active");
+}
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2400);
+}
+function openModal(id){ document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id){ document.getElementById(id).classList.add("hidden"); }
+
+/* =========================== VAULT / CRYPTO (local storage) =========================== */
+
+async function deriveVaultKey(pin, saltB64){
+  const salt = new Uint8Array(b64ToBuf(saltB64));
+  const baseKey = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt, iterations:200000, hash:"SHA-256" },
+    baseKey,
+    { name:"AES-GCM", length:256 },
+    false,
+    ["encrypt","decrypt"]
+  );
+}
+async function vaultEncrypt(key, plaintextStr){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, enc.encode(plaintextStr));
+  return { iv: bufToB64(iv), ct: bufToB64(ct) };
+}
+async function vaultDecrypt(key, ivB64, ctB64){
+  const iv = new Uint8Array(b64ToBuf(ivB64));
+  const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, b64ToBuf(ctB64));
+  return dec.decode(pt);
+}
+async function ensureVaultInitialized(){
+  if (localStorage.getItem("vlt_salt") && localStorage.getItem("vlt_canary_iv")) return;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltB64 = bufToB64(salt);
+  localStorage.setItem("vlt_salt", saltB64);
+  const key = await deriveVaultKey("1234", saltB64); // default PIN
+  const {iv, ct} = await vaultEncrypt(key, "OK");
+  localStorage.setItem("vlt_canary_iv", iv);
+  localStorage.setItem("vlt_canary_ct", ct);
+}
+async function tryUnlock(pinCandidate){
+  const salt = localStorage.getItem("vlt_salt");
+  const civ = localStorage.getItem("vlt_canary_iv");
+  const cct = localStorage.getItem("vlt_canary_ct");
+  if (!salt || !civ || !cct) return null;
+  try{
+    const key = await deriveVaultKey(pinCandidate, salt);
+    const pt = await vaultDecrypt(key, civ, cct);
+    return pt === "OK" ? key : null;
+  }catch(e){
+    return null;
+  }
+}
+async function loadProfile(key){
+  const iv = localStorage.getItem("vlt_profile_iv");
+  if (!iv) return null;
+  return JSON.parse(await vaultDecrypt(key, iv, localStorage.getItem("vlt_profile_ct")));
+}
+async function saveProfile(key, profileObj){
+  const {iv, ct} = await vaultEncrypt(key, JSON.stringify(profileObj));
+  localStorage.setItem("vlt_profile_iv", iv);
+  localStorage.setItem("vlt_profile_ct", ct);
+}
+async function loadContacts(key){
+  const iv = localStorage.getItem("vlt_contacts_iv");
+  if (!iv) return [];
+  return JSON.parse(await vaultDecrypt(key, iv, localStorage.getItem("vlt_contacts_ct")));
+}
+async function saveContacts(key, arr){
+  const {iv, ct} = await vaultEncrypt(key, JSON.stringify(arr));
+  localStorage.setItem("vlt_contacts_iv", iv);
+  localStorage.setItem("vlt_contacts_ct", ct);
+}
+async function changePin(oldPin, newPin){
+  const oldKey = await tryUnlock(oldPin);
+  if (!oldKey) throw new Error("WRONG_OLD_PIN");
+  const newSalt = crypto.getRandomValues(new Uint8Array(16));
+  const newSaltB64 = bufToB64(newSalt);
+  const newKey = await deriveVaultKey(newPin, newSaltB64);
+
+  const hasProfile = !!localStorage.getItem("vlt_profile_iv");
+  const profilePlain = hasProfile
+    ? await vaultDecrypt(oldKey, localStorage.getItem("vlt_profile_iv"), localStorage.getItem("vlt_profile_ct"))
+    : null;
+  const contactsPlain = localStorage.getItem("vlt_contacts_iv")
+    ? await vaultDecrypt(oldKey, localStorage.getItem("vlt_contacts_iv"), localStorage.getItem("vlt_contacts_ct"))
+    : "[]";
+
+  const allMsgs = await idbGetAllMessages();
+  for (const m of allMsgs){
+    const plain = await vaultDecrypt(oldKey, m.iv, m.ct);
+    const re = await vaultEncrypt(newKey, plain);
+    m.iv = re.iv; m.ct = re.ct;
+    await idbPutMessage(m);
+  }
+
+  localStorage.setItem("vlt_salt", newSaltB64);
+  const canary = await vaultEncrypt(newKey, "OK");
+  localStorage.setItem("vlt_canary_iv", canary.iv);
+  localStorage.setItem("vlt_canary_ct", canary.ct);
+
+  if (profilePlain !== null){
+    const p = await vaultEncrypt(newKey, profilePlain);
+    localStorage.setItem("vlt_profile_iv", p.iv);
+    localStorage.setItem("vlt_profile_ct", p.ct);
+  }
+  const c = await vaultEncrypt(newKey, contactsPlain);
+  localStorage.setItem("vlt_contacts_iv", c.iv);
+  localStorage.setItem("vlt_contacts_ct", c.ct);
+
+  return newKey;
+}
+
+/* =========================== INDEXEDDB (message store) =========================== */
+
+function idbOpen(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("vaultdb", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("messages")){
+        const store = db.createObjectStore("messages", {keyPath:"id", autoIncrement:true});
+        store.createIndex("peerId", "peerId", {unique:false});
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbAddMessage(msg){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("messages","readwrite");
+    const req = tx.objectStore("messages").add(msg);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPutMessage(msg){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("messages","readwrite");
+    tx.objectStore("messages").put(msg);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGetMessagesForPeer(peerId){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("messages","readonly");
+    const req = tx.objectStore("messages").index("peerId").getAll(peerId);
+    req.onsuccess = () => resolve(req.result.sort((a,b)=>a.ts-b.ts));
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGetAllMessages(){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("messages","readonly");
+    const req = tx.objectStore("messages").getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function persistMessage(peerId, dir, payloadObj){
+  const {iv, ct} = await vaultEncrypt(currentVaultKey, JSON.stringify(payloadObj));
+  const msg = { peerId, dir, iv, ct, ts: Date.now() };
+  const id = await idbAddMessage(msg);
+  msg.id = id;
+  return msg;
+}
+async function decryptStoredMessage(msg){
+  return JSON.parse(await vaultDecrypt(currentVaultKey, msg.iv, msg.ct));
+}
+
+/* =========================== STATE =========================== */
+
+let currentVaultKey = null;
+let myProfile = null;
+let peer = null;
+let currentOpenPeer = null;
+const sessions = {}; // peerId -> {conn, myKeyPair, sharedKey, outbox:[], incomingChunks:{}, connecting}
+
+/* =========================== CALCULATOR CORE =========================== */
+
+let calcEntry = "";
+let calcResultShown = false;
+let calcErrored = false;
+const calcDisplayEl = document.getElementById("calc-display-text");
+
+function renderCalcDisplay(){
+  calcDisplayEl.textContent = calcEntry === "" ? "0" : calcEntry;
+}
+function tokenize(str){
+  const tokens = [];
+  let i = 0;
+  while (i < str.length){
+    const c = str[i];
+    if (/[0-9.]/.test(c)){
+      let j = i;
+      while (j < str.length && /[0-9.]/.test(str[j])) j++;
+      tokens.push({t:"num", v: parseFloat(str.slice(i,j))});
+      i = j;
+    } else if ("+-*/%".includes(c)){
+      tokens.push({t:"op", v:c});
+      i++;
+    } else {
+      i++;
+    }
+  }
+  return tokens;
+}
+function evalExpression(str){
+  const tokens = tokenize(str);
+  if (!tokens.length) return 0;
+  let pos = 0;
+  function parseFactor(){
+    let sign = 1;
+    while (tokens[pos] && tokens[pos].t === "op" && (tokens[pos].v === "-" || tokens[pos].v === "+")){
+      if (tokens[pos].v === "-") sign *= -1;
+      pos++;
+    }
+    const tok = tokens[pos];
+    if (!tok || tok.t !== "num") throw new Error("bad expression");
+    pos++;
+    return sign * tok.v;
+  }
+  function parseTerm(){
+    let val = parseFactor();
+    while (tokens[pos] && tokens[pos].t === "op" && "*/%".includes(tokens[pos].v)){
+      const op = tokens[pos].v; pos++;
+      const rhs = parseFactor();
+      if (op === "*") val *= rhs;
+      else if (op === "/") val /= rhs;
+      else val %= rhs;
+    }
+    return val;
+  }
+  function parseExpr(){
+    let val = parseTerm();
+    while (tokens[pos] && tokens[pos].t === "op" && "+-".includes(tokens[pos].v)){
+      const op = tokens[pos].v; pos++;
+      const rhs = parseTerm();
+      if (op === "+") val += rhs; else val -= rhs;
+    }
+    return val;
+  }
+  const res = parseExpr();
+  if (pos !== tokens.length) throw new Error("bad expression");
+  if (!isFinite(res)) throw new Error("math error");
+  return res;
+}
+function formatNumber(n){
+  const rounded = Math.round(n * 1e9) / 1e9;
+  let s = String(rounded);
+  if (s.length > 14) s = rounded.toExponential(6);
+  return s;
+}
+
+async function calcEquals(){
+  // A pure-digit entry of plausible PIN length is first checked silently
+  // against the vault. If it's wrong, this just behaves like a normal
+  // calculator (typing "1234" "=" on any calculator shows 1234).
+  if (/^[0-9]{4,8}$/.test(calcEntry)){
+    const key = await tryUnlock(calcEntry);
+    if (key){
+      calcEntry = ""; calcResultShown = false;
+      renderCalcDisplay();
+      await enterVault(key);
+      return;
+    }
+  }
+  try{
+    const result = evalExpression(calcEntry);
+    calcEntry = formatNumber(result);
+    calcErrored = false;
+  }catch(e){
+    calcEntry = "Error";
+    calcErrored = true;
+  }
+  calcResultShown = true;
+  renderCalcDisplay();
+}
+function calcPressDigit(d){
+  if (calcErrored){ calcEntry = ""; calcErrored = false; }
+  else if (calcResultShown){ calcEntry = ""; calcResultShown = false; }
+  calcEntry += d;
+  renderCalcDisplay();
+}
+function calcPressDot(){
+  if (calcErrored){ calcEntry = ""; calcErrored = false; }
+  else if (calcResultShown){ calcEntry = ""; calcResultShown = false; }
+  const lastNum = calcEntry.split(/[+\-*/%]/).pop();
+  if (!lastNum.includes(".")) calcEntry += (lastNum === "" ? "0." : ".");
+  renderCalcDisplay();
+}
+function calcPressOp(op){
+  if (calcErrored){ calcEntry = ""; calcErrored = false; }
+  calcResultShown = false;
+  if (calcEntry === "" && op !== "-") return;
+  const last = calcEntry[calcEntry.length-1];
+  if ("+-*/%".includes(last)) calcEntry = calcEntry.slice(0,-1) + op;
+  else calcEntry += op;
+  renderCalcDisplay();
+}
+function calcClear(){
+  calcEntry = ""; calcErrored = false; calcResultShown = false;
+  renderCalcDisplay();
+}
+function calcBackspace(){
+  if (calcErrored){ calcClear(); return; }
+  calcEntry = calcEntry.slice(0, -1);
+  renderCalcDisplay();
+}
+
+document.querySelectorAll(".calc-key").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.digit !== undefined) calcPressDigit(btn.dataset.digit);
+    else if (btn.dataset.op !== undefined) calcPressOp(btn.dataset.op);
+    else if (btn.dataset.action === "dot") calcPressDot();
+    else if (btn.dataset.action === "clear") calcClear();
+    else if (btn.dataset.action === "backspace") calcBackspace();
+    else if (btn.dataset.action === "equals") calcEquals();
+  });
+});
+renderCalcDisplay();
+
+/* =========================== AUTO-LOCK =========================== */
+
+function lockVault(){
+  if (peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+  Object.keys(sessions).forEach(k => delete sessions[k]);
+  currentVaultKey = null;
+  myProfile = null;
+  currentOpenPeer = null;
+  calcClear();
+  showScreen("screen-calc");
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && currentVaultKey) lockVault();
+});
+document.getElementById("btn-lock").addEventListener("click", lockVault);
+document.getElementById("btn-lock-2").addEventListener("click", lockVault);
+
+/* =========================== ENTERING THE VAULT =========================== */
+
+async function enterVault(key){
+  currentVaultKey = key;
+  const profile = await loadProfile(key);
+  if (!profile){
+    showScreen("screen-onboard");
+    return;
+  }
+  myProfile = profile;
+  await startPeerSession(profile.peerId);
+  await renderChatListScreen();
+  showScreen("screen-chats");
+}
+
+function sanitizeId(raw){
+  return raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24);
+}
+
+document.getElementById("onboard-submit").addEventListener("click", async () => {
+  const idInput = document.getElementById("onboard-id");
+  const nameInput = document.getElementById("onboard-name");
+  const msgEl = document.getElementById("onboard-msg");
+  const id = sanitizeId(idInput.value);
+  if (id.length < 3){
+    msgEl.textContent = "ID must be at least 3 characters (letters, numbers, _ or -).";
+    return;
+  }
+  msgEl.textContent = "Connecting…";
+  try{
+    await startPeerSession(id);
+  }catch(err){
+    msgEl.textContent = "That ID is taken or unavailable — try another.";
+    return;
+  }
+  const profile = { peerId: id, displayName: nameInput.value.trim() || id };
+  myProfile = profile;
+  await saveProfile(currentVaultKey, profile);
+  await saveContacts(currentVaultKey, []);
+  msgEl.textContent = "";
+  await renderChatListScreen();
+  showScreen("screen-chats");
+});
+
+/* =========================== PEERJS / WEBRTC TRANSPORT =========================== */
+
+function startPeerSession(peerId){
+  return new Promise((resolve, reject) => {
+    try{
+      peer = new Peer(peerId, { debug: 0 });
+    }catch(e){ reject(e); return; }
+    let settled = false;
+    peer.on("open", (id) => { settled = true; resolve(id); });
+    peer.on("error", (err) => {
+      if (!settled){ settled = true; reject(err); }
+      else if (err && err.type === "peer-unavailable"){
+        showToast("That contact isn't reachable right now.");
+      }
+    });
+    peer.on("connection", (conn) => attachConnection(conn));
+  });
+}
+
+function attachConnection(conn){
+  const peerId = conn.peer;
+  if (!sessions[peerId]){
+    sessions[peerId] = { conn, myKeyPair:null, sharedKey:null, outbox:[], incomingChunks:{}, connecting:true };
+  } else {
+    sessions[peerId].conn = conn;
+    sessions[peerId].connecting = true;
+    sessions[peerId].sharedKey = null;
+  }
+  const s = sessions[peerId];
+
+  conn.on("open", async () => {
+    s.connecting = false;
+    updateConvoStatus(peerId);
+    s.myKeyPair = await crypto.subtle.generateKey({name:"ECDH", namedCurve:"P-256"}, true, ["deriveKey"]);
+    const rawPub = await crypto.subtle.exportKey("raw", s.myKeyPair.publicKey);
+    conn.send({ mtype:"hello", pub: bufToB64(rawPub) });
+  });
+  conn.on("data", (data) => handleIncoming(peerId, data));
+  conn.on("close", () => {
+    s.sharedKey = null; s.conn = null;
+    updateConvoStatus(peerId);
+  });
+  conn.on("error", () => updateConvoStatus(peerId));
+
+  return s;
+}
+
+async function ensureSession(peerId){
+  if (sessions[peerId] && sessions[peerId].conn && sessions[peerId].conn.open) return sessions[peerId];
+  if (sessions[peerId] && sessions[peerId].connecting) return sessions[peerId];
+  if (!peer) return null;
+  const conn = peer.connect(peerId, { reliable: true });
+  return attachConnection(conn);
+}
+
+async function handleIncoming(peerId, data){
+  const s = sessions[peerId];
+  if (!s) return;
+
+  if (data.mtype === "hello"){
+    const theirPub = await crypto.subtle.importKey(
+      "raw", b64ToBuf(data.pub), {name:"ECDH", namedCurve:"P-256"}, true, []
+    );
+    if (!s.myKeyPair){
+      s.myKeyPair = await crypto.subtle.generateKey({name:"ECDH", namedCurve:"P-256"}, true, ["deriveKey"]);
+      const rawPub = await crypto.subtle.exportKey("raw", s.myKeyPair.publicKey);
+      s.conn.send({ mtype:"hello", pub: bufToB64(rawPub) });
+    }
+    s.sharedKey = await crypto.subtle.deriveKey(
+      { name:"ECDH", public: theirPub },
+      s.myKeyPair.privateKey,
+      { name:"AES-GCM", length:256 },
+      false,
+      ["encrypt","decrypt"]
+    );
+    updateConvoStatus(peerId);
+    await ensureContactExists(peerId);
+    await flushOutbox(peerId);
+    return;
+  }
+  if (data.mtype === "chunk"){
+    const bucket = s.incomingChunks[data.id] || (s.incomingChunks[data.id] = { total:data.total, parts:[] });
+    bucket.parts[data.idx] = data.part;
+    if (bucket.parts.filter(Boolean).length === bucket.total){
+      const full = bucket.parts.join("");
+      delete s.incomingChunks[data.id];
+      await decryptAndStoreIncoming(peerId, JSON.parse(full));
+    }
+    return;
+  }
+  if (data.mtype === "msg"){
+    await decryptAndStoreIncoming(peerId, { iv:data.iv, ct:data.ct });
+  }
+}
+
+async function decryptAndStoreIncoming(peerId, envelope){
+  const s = sessions[peerId];
+  if (!s || !s.sharedKey) return;
+  let plainBuf;
+  try{
+    const iv = new Uint8Array(b64ToBuf(envelope.iv));
+    plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv}, s.sharedKey, b64ToBuf(envelope.ct));
+  }catch(e){ return; }
+  const payloadObj = JSON.parse(dec.decode(plainBuf));
+  const msg = await persistMessage(peerId, "in", payloadObj);
+  await ensureContactExists(peerId);
+  if (currentOpenPeer === peerId){
+    appendMessageBubble(msg, payloadObj);
+  } else {
+    showToast("New message from " + (await contactLabel(peerId)));
+  }
+  await renderChatListScreen();
+}
+
+async function sendPayload(peerId, payloadObj){
+  const msg = await persistMessage(peerId, "out", payloadObj);
+  appendMessageBubble(msg, payloadObj, "sending");
+  await renderChatListScreen();
+  await ensureSession(peerId);
+  const s = sessions[peerId];
+  if (s && s.sharedKey && s.conn && s.conn.open){
+    await transmit(peerId, payloadObj);
+    setMessageStatus(msg.id, "sent");
+  } else if (s) {
+    s.outbox.push({ payloadObj, msgId: msg.id });
+  }
+}
+async function transmit(peerId, payloadObj){
+  const s = sessions[peerId];
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ctBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv}, s.sharedKey, enc.encode(JSON.stringify(payloadObj)));
+  const envelopeStr = JSON.stringify({ iv: bufToB64(iv), ct: bufToB64(ctBuf) });
+  if (envelopeStr.length > 60000){
+    const id = crypto.randomUUID();
+    const chunkSize = 48000;
+    const total = Math.ceil(envelopeStr.length / chunkSize);
+    for (let i=0;i<total;i++){
+      s.conn.send({ mtype:"chunk", id, idx:i, total, part: envelopeStr.slice(i*chunkSize, (i+1)*chunkSize) });
+    }
+  } else {
+    s.conn.send({ mtype:"msg", iv: JSON.parse(envelopeStr).iv, ct: JSON.parse(envelopeStr).ct });
+  }
+}
+async function flushOutbox(peerId){
+  const s = sessions[peerId];
+  if (!s) return;
+  while (s.outbox.length){
+    const {payloadObj, msgId} = s.outbox.shift();
+    await transmit(peerId, payloadObj);
+    setMessageStatus(msgId, "sent");
+  }
+}
+
+/* =========================== CONTACTS =========================== */
+
+async function contactLabel(peerId){
+  const contacts = await loadContacts(currentVaultKey);
+  const c = contacts.find(c => c.peerId === peerId);
+  return c ? c.nickname : peerId;
+}
+async function ensureContactExists(peerId){
+  const contacts = await loadContacts(currentVaultKey);
+  if (!contacts.find(c => c.peerId === peerId)){
+    contacts.push({ peerId, nickname: peerId, addedAt: Date.now() });
+    await saveContacts(currentVaultKey, contacts);
+  }
+}
+
+/* =========================== CHAT LIST UI =========================== */
+
+async function renderChatListScreen(){
+  const contacts = await loadContacts(currentVaultKey);
+  const listEl = document.getElementById("chat-list");
+  listEl.innerHTML = "";
+  if (!contacts.length){
+    listEl.innerHTML = '<div class="empty-state">No conversations yet.<br>Tap + to add someone by their ID.</div>';
+    return;
+  }
+  const withPreview = [];
+  for (const c of contacts){
+    const msgs = await idbGetMessagesForPeer(c.peerId);
+    const last = msgs[msgs.length - 1];
+    let previewText = "No messages yet";
+    if (last){
+      const p = await decryptStoredMessage(last);
+      previewText = p.kind === "image" ? "📷 Photo" : p.text;
+    }
+    withPreview.push({ c, last, previewText });
+  }
+  withPreview.sort((a,b) => (b.last ? b.last.ts : 0) - (a.last ? a.last.ts : 0));
+
+  for (const { c, last, previewText } of withPreview){
+    const row = document.createElement("div");
+    row.className = "contact-row";
+    const online = !!(sessions[c.peerId] && sessions[c.peerId].conn && sessions[c.peerId].conn.open && sessions[c.peerId].sharedKey);
+    row.innerHTML = `
+      <div class="avatar">${(c.nickname||"?").slice(0,1).toUpperCase()}<span class="status-dot ${online?'online':''}"></span></div>
+      <div class="contact-meta">
+        <div class="name"></div>
+        <div class="preview"></div>
+      </div>
+      <div class="contact-time">${last ? formatTime(last.ts) : ""}</div>
+    `;
+    row.querySelector(".name").textContent = c.nickname;
+    row.querySelector(".preview").textContent = previewText;
+    row.addEventListener("click", () => openConversation(c.peerId));
+    listEl.appendChild(row);
+  }
+}
+function formatTime(ts){
+  const d = new Date(ts);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()){
+    return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  }
+  return d.toLocaleDateString([], {month:"short", day:"numeric"});
+}
+
+document.getElementById("btn-add-contact").addEventListener("click", () => {
+  document.getElementById("add-contact-id").value = "";
+  document.getElementById("add-contact-name").value = "";
+  openModal("modal-add-contact");
+});
+document.getElementById("btn-cancel-add-contact").addEventListener("click", () => closeModal("modal-add-contact"));
+document.getElementById("add-contact-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const peerId = sanitizeId(document.getElementById("add-contact-id").value);
+  const nickname = document.getElementById("add-contact-name").value.trim() || peerId;
+  if (!peerId) return;
+  const contacts = await loadContacts(currentVaultKey);
+  if (!contacts.find(c => c.peerId === peerId)){
+    contacts.push({ peerId, nickname, addedAt: Date.now() });
+    await saveContacts(currentVaultKey, contacts);
+  }
+  closeModal("modal-add-contact");
+  await renderChatListScreen();
+});
+
+/* =========================== CONVERSATION UI =========================== */
+
+const convoMessagesEl = document.getElementById("convo-messages");
+
+async function openConversation(peerId){
+  currentOpenPeer = peerId;
+  const contacts = await loadContacts(currentVaultKey);
+  const c = contacts.find(c => c.peerId === peerId);
+  document.getElementById("convo-header-name").textContent = c ? c.nickname : peerId;
+  convoMessagesEl.innerHTML = "";
+  const msgs = await idbGetMessagesForPeer(peerId);
+  for (const m of msgs){
+    const payload = await decryptStoredMessage(m);
+    appendMessageBubble(m, payload, "sent");
+  }
+  showScreen("screen-convo");
+  updateConvoStatus(peerId);
+  await ensureSession(peerId);
+}
+
+function updateConvoStatus(peerId){
+  if (currentOpenPeer !== peerId) return;
+  const s = sessions[peerId];
+  const el = document.getElementById("convo-header-status");
+  if (s && s.conn && s.conn.open && s.sharedKey){
+    el.textContent = "End-to-end encrypted • Online";
+  } else if (s && (s.connecting || (s.conn && s.conn.open))){
+    el.textContent = "Connecting…";
+  } else {
+    el.textContent = "Offline — they need the app open too";
+  }
+  renderChatListScreen();
+}
+
+function appendMessageBubble(msg, payload, status){
+  const div = document.createElement("div");
+  div.className = "bubble " + (msg.dir === "out" ? "out" : "in");
+  div.dataset.msgId = msg.id;
+  if (payload.kind === "image"){
+    const img = document.createElement("img");
+    img.src = `data:${payload.mime};base64,${payload.dataB64}`;
+    img.alt = payload.name || "image";
+    div.appendChild(img);
+  } else {
+    const textDiv = document.createElement("div");
+    textDiv.textContent = payload.text;
+    div.appendChild(textDiv);
+  }
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = formatTime(msg.ts) + (msg.dir === "out" ? (status === "sending" ? " · sending" : " · sent") : "");
+  div.appendChild(meta);
+  convoMessagesEl.appendChild(div);
+  convoMessagesEl.scrollTop = convoMessagesEl.scrollHeight;
+}
+function setMessageStatus(msgId, status){
+  const el = convoMessagesEl.querySelector(`[data-msg-id="${msgId}"] .meta`);
+  if (!el) return;
+  const time = el.textContent.split(" · ")[0];
+  el.textContent = time + (status === "sent" ? " · sent" : " · sending");
+}
+
+document.getElementById("btn-back-to-chats").addEventListener("click", () => {
+  currentOpenPeer = null;
+  renderChatListScreen();
+  showScreen("screen-chats");
+});
+document.getElementById("btn-back-to-chats-2").addEventListener("click", () => showScreen("screen-chats"));
+
+document.getElementById("btn-send").addEventListener("click", sendCurrentText);
+document.getElementById("convo-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    sendCurrentText();
+  }
+});
+async function sendCurrentText(){
+  const input = document.getElementById("convo-input");
+  const text = input.value.trim();
+  if (!text || !currentOpenPeer) return;
+  input.value = "";
+  input.style.height = "auto";
+  await sendPayload(currentOpenPeer, { kind:"text", text });
+}
+document.getElementById("convo-input").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 110) + "px";
+});
+
+document.getElementById("btn-attach").addEventListener("click", () => {
+  document.getElementById("convo-attach-input").click();
+});
+document.getElementById("convo-attach-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !currentOpenPeer) return;
+  try{
+    const blob = await downscaleImage(file, 1600, 0.8);
+    const dataB64 = await blobToBase64(blob);
+    await sendPayload(currentOpenPeer, { kind:"image", mime: blob.type || "image/jpeg", name: file.name, dataB64 });
+  }catch(err){
+    showToast("Couldn't send that image.");
+  }
+});
+async function downscaleImage(file, maxDim, quality){
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > maxDim || height > maxDim){
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+  return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+}
+function blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+document.getElementById("btn-rename-contact").addEventListener("click", async () => {
+  if (!currentOpenPeer) return;
+  const contacts = await loadContacts(currentVaultKey);
+  const c = contacts.find(c => c.peerId === currentOpenPeer);
+  document.getElementById("rename-contact-name").value = c ? c.nickname : "";
+  openModal("modal-rename-contact");
+});
+document.getElementById("btn-cancel-rename-contact").addEventListener("click", () => closeModal("modal-rename-contact"));
+document.getElementById("rename-contact-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const newName = document.getElementById("rename-contact-name").value.trim();
+  if (!newName || !currentOpenPeer) return;
+  const contacts = await loadContacts(currentVaultKey);
+  const c = contacts.find(c => c.peerId === currentOpenPeer);
+  if (c) c.nickname = newName;
+  await saveContacts(currentVaultKey, contacts);
+  document.getElementById("convo-header-name").textContent = newName;
+  closeModal("modal-rename-contact");
+  await renderChatListScreen();
+});
+
+/* =========================== SETTINGS UI =========================== */
+
+document.getElementById("btn-settings").addEventListener("click", async () => {
+  document.getElementById("settings-your-id").textContent = myProfile ? myProfile.peerId : "—";
+  document.getElementById("settings-display-name").value = myProfile ? myProfile.displayName : "";
+  document.getElementById("pin-msg").textContent = "";
+  document.getElementById("change-pin-form").reset();
+  showScreen("screen-settings");
+});
+document.getElementById("btn-copy-id").addEventListener("click", async () => {
+  if (!myProfile) return;
+  try{
+    await navigator.clipboard.writeText(myProfile.peerId);
+    showToast("ID copied");
+  }catch(e){
+    showToast(myProfile.peerId);
+  }
+});
+document.getElementById("btn-save-name").addEventListener("click", async () => {
+  const name = document.getElementById("settings-display-name").value.trim();
+  if (!name || !myProfile) return;
+  myProfile.displayName = name;
+  await saveProfile(currentVaultKey, myProfile);
+  showToast("Name saved");
+});
+document.getElementById("change-pin-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const oldPin = document.getElementById("pin-old").value;
+  const newPin1 = document.getElementById("pin-new1").value;
+  const newPin2 = document.getElementById("pin-new2").value;
+  const msgEl = document.getElementById("pin-msg");
+  msgEl.className = "settings-msg";
+  if (newPin1 !== newPin2){
+    msgEl.textContent = "New PINs don't match."; msgEl.classList.add("error"); return;
+  }
+  if (!/^[0-9]{4,8}$/.test(newPin1)){
+    msgEl.textContent = "PIN must be 4–8 digits."; msgEl.classList.add("error"); return;
+  }
+  try{
+    const newKey = await changePin(oldPin, newPin1);
+    currentVaultKey = newKey;
+    msgEl.textContent = "PIN updated."; msgEl.classList.add("success");
+    e.target.reset();
+  }catch(err){
+    msgEl.textContent = "Current PIN is incorrect."; msgEl.classList.add("error");
+  }
+});
+
+/* =========================== BOOTSTRAP =========================== */
+
+(async () => {
+  await ensureVaultInitialized();
+  if ("serviceWorker" in navigator){
+    try{ await navigator.serviceWorker.register("sw.js"); }catch(e){ /* offline shell is best-effort */ }
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
